@@ -109,6 +109,16 @@ npm run test:run      # Single run
 npm run test:coverage # With coverage report
 ```
 
+## Deployment (Fly.io GitHub Actions)
+
+If you use the provided GitHub Actions workflow (`.github/workflows/deploy.yml`) to deploy to Fly.io, add the following secrets in your GitHub repository settings:
+
+- `FLY_API_TOKEN` (required) - Fly.io API token for your account
+- `GEMINI_API_KEY` (optional) - Gemini API key used by the app
+- `OPENAI_API_KEY` (optional) - OpenAI API key used by the app
+- `REPLICATE_API_KEY` (optional) - Replicate API key used by the app
+- `FAL_API_KEY` (optional) - fal.ai API key used by the app
+
 ## Contributions
 PRs are welcome, please pull the latest changes from develop before creating a PR and make it to the develop branch, not master. Not that I'm primarily making this for my own workflows, if the PR conflicts with my own plans I'll politely reject it. If you want to collaborate, consider joining the Discord and we can hash something out. 
 
