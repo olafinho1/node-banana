@@ -1,0 +1,54 @@
+name: Deploy to Fly.io
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: fly-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Configure secrets
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REPLICATE_API_KEY: ${{ secrets.REPLICATE_API_KEY }}
+          FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${FLY_API_TOKEN}" ]; then
+            echo "FLY_API_TOKEN is not set."
+            exit 1
+          fi
+
+          set_secret() {
+            local key="$1"
+            local value="$2"
+            if [ -n "${value}" ]; then
+              flyctl secrets set "${key}=${value}" -c fly.toml
+            fi
+          }
+
+          set_secret GEMINI_API_KEY "${GEMINI_API_KEY}"
+          set_secret OPENAI_API_KEY "${OPENAI_API_KEY}"
+          set_secret REPLICATE_API_KEY "${REPLICATE_API_KEY}"
+          set_secret FAL_API_KEY "${FAL_API_KEY}"
+
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: flyctl deploy -c fly.toml
