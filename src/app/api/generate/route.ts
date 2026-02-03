@@ -20,11 +20,27 @@ import { uploadImageForUrl, shouldUseImageUrl, deleteImages } from "@/lib/images
 export const maxDuration = 600; // 10 minute timeout for video generation (Vercel only)
 export const dynamic = 'force-dynamic'; // Ensure this route is always dynamic
 
+const DEFAULT_GEMINI_TIMEOUT_MS = 9 * 60 * 1000;
+
 // Map model types to Gemini model IDs
 const MODEL_MAP: Record<ModelType, string> = {
   "nano-banana": "gemini-2.5-flash-image", // Updated to correct model name
   "nano-banana-pro": "gemini-3-pro-image-preview",
 };
+
+function resolveGeminiTimeoutMs() {
+  const rawValue = process.env.GEMINI_TIMEOUT_MS;
+  if (!rawValue) {
+    return DEFAULT_GEMINI_TIMEOUT_MS;
+  }
+
+  const parsed = Number(rawValue);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_GEMINI_TIMEOUT_MS;
+  }
+
+  return parsed;
+}
 
 /**
  * Extended request format that supports both legacy and multi-provider requests
@@ -66,7 +82,8 @@ async function generateWithGemini(
   });
 
   // Initialize Gemini client
-  const ai = new GoogleGenAI({ apiKey });
+  const geminiTimeoutMs = resolveGeminiTimeoutMs();
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: geminiTimeoutMs } });
 
   // Build request parts array with prompt and all images
   const requestParts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [
@@ -106,6 +123,7 @@ async function generateWithGemini(
   }
 
   console.log(`[API:${requestId}] Config: ${JSON.stringify(config)}`);
+  console.log(`[API:${requestId}] Gemini timeout: ${geminiTimeoutMs}ms`);
 
   // Make request to Gemini
   const geminiStartTime = Date.now();
@@ -1532,6 +1550,26 @@ export async function POST(request: NextRequest) {
           error: "Rate limit reached. Please wait and try again.",
         },
         { status: 429 }
+      );
+    }
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return NextResponse.json<GenerateResponse>(
+        {
+          success: false,
+          error: "Gemini request timed out. Please try again or reduce the request size.",
+        },
+        { status: 504 }
+      );
+    }
+
+    if (errorMessage.toLowerCase().includes("timeout") || errorMessage.toLowerCase().includes("aborted")) {
+      return NextResponse.json<GenerateResponse>(
+        {
+          success: false,
+          error: "Gemini request timed out. Please try again or reduce the request size.",
+        },
+        { status: 504 }
       );
     }
 
